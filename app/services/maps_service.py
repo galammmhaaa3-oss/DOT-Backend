@@ -1,6 +1,6 @@
 import httpx
 from typing import Tuple, Dict, Optional
-from .config import settings
+from ..config import settings
 
 
 class MapsService:
