@@ -1,0 +1,31 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: dot-database
+    env: docker
+    plan: free
+    region: frankfurt
+    
+  # FastAPI Backend
+  - type: web
+    name: dot-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dot-database
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_MAPS_API_KEY
+        value: AIzaSyCSOCXV_5b8a7Om3F1UQY82ED-vjraBK0U
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 10080
+      - key: DEFAULT_COMMISSION
+        value: 5000
