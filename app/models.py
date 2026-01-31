@@ -40,7 +40,7 @@ class User(Base):
     phone = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, nullable=True)  # Email field added
     name = Column(String, nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.CUSTOMER)
+    role = Column(Enum(UserRole, native_enum=False, length=50), default=UserRole.CUSTOMER)
     password_hash = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -71,7 +71,7 @@ class Transaction(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     wallet_id = Column(Integer, ForeignKey("wallets.id"))
-    type = Column(Enum(TransactionType), nullable=False)
+    type = Column(Enum(TransactionType, native_enum=False, length=50), nullable=False)
     amount = Column(Float, nullable=False)
     description = Column(String)
     order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
@@ -87,8 +87,8 @@ class Order(Base):
     __tablename__ = "orders"
     
     id = Column(Integer, primary_key=True, index=True)
-    type = Column(Enum(OrderType), nullable=False)
-    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
+    type = Column(Enum(OrderType, native_enum=False, length=50), nullable=False)
+    status = Column(Enum(OrderStatus, native_enum=False, length=50), default=OrderStatus.PENDING)
     
     # Customer
     customer_id = Column(Integer, ForeignKey("users.id"))
@@ -141,8 +141,8 @@ class OrderStatusLog(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"))
-    old_status = Column(Enum(OrderStatus))
-    new_status = Column(Enum(OrderStatus))
+    old_status = Column(Enum(OrderStatus, native_enum=False, length=50))
+    new_status = Column(Enum(OrderStatus, native_enum=False, length=50))
     changed_by = Column(Integer, ForeignKey("users.id"))
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     notes = Column(Text, nullable=True)
