@@ -30,14 +30,17 @@ async def get_dashboard_stats(
     try:
         # عدد المستخدمين (بدون admin)
         total_users_query = select(func.count(User.id)).where(
-            User.role != UserRole.ADMIN
+            User.role.astext != UserRole.ADMIN.value
         )
         total_users_result = await db.execute(total_users_query)
         total_users = total_users_result.scalar() or 0
         
         # عدد السائقين النشطين
         total_drivers_query = select(func.count(User.id)).where(
-            and_(User.role == UserRole.DRIVER, User.is_active == True)
+            and_(
+                User.role.astext == UserRole.DRIVER.value,
+                User.is_active == True
+            )
         )
         total_drivers_result = await db.execute(total_drivers_query)
         total_drivers = total_drivers_result.scalar() or 0
