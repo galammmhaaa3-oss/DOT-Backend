@@ -29,49 +29,53 @@ async def get_dashboard_stats(
     """Get dashboard statistics from real data"""
     try:
         # عدد المستخدمين (بدون admin)
-        total_users_query = select(func.count(User.id)).where(
-            User.role.astext != UserRole.ADMIN.value
+        total_users_result = await db.execute(
+            select(func.count(User.id)).where(
+                User.role != "admin"
+            )
         )
-        total_users_result = await db.execute(total_users_query)
         total_users = total_users_result.scalar() or 0
         
         # عدد السائقين النشطين
-        total_drivers_query = select(func.count(User.id)).where(
-            and_(
-                User.role.astext == UserRole.DRIVER.value,
-                User.is_active == True
+        total_drivers_result = await db.execute(
+            select(func.count(User.id)).where(
+                and_(
+                    User.role == "driver",
+                    User.is_active == True
+                )
             )
         )
-        total_drivers_result = await db.execute(total_drivers_query)
         total_drivers = total_drivers_result.scalar() or 0
         
         # عدد الطلبات اليوم
         today = datetime.now().date()
-        today_orders_query = select(func.count(Order.id)).where(
-            and_(
-                Order.created_at >= datetime.combine(today, datetime.min.time()),
-                Order.created_at <= datetime.combine(today, datetime.max.time())
+        today_orders_result = await db.execute(
+            select(func.count(Order.id)).where(
+                and_(
+                    Order.created_at >= datetime.combine(today, datetime.min.time()),
+                    Order.created_at <= datetime.combine(today, datetime.max.time())
+                )
             )
         )
-        today_orders_result = await db.execute(today_orders_query)
         today_orders = today_orders_result.scalar() or 0
         
         # إجمالي الأرباح اليوم (الطلبات المكتملة فقط)
-        today_revenue_query = select(func.sum(Order.price)).where(
-            and_(
-                Order.created_at >= datetime.combine(today, datetime.min.time()),
-                Order.created_at <= datetime.combine(today, datetime.max.time()),
-                Order.status == "completed"
+        today_revenue_result = await db.execute(
+            select(func.sum(Order.price)).where(
+                and_(
+                    Order.created_at >= datetime.combine(today, datetime.min.time()),
+                    Order.created_at <= datetime.combine(today, datetime.max.time()),
+                    Order.status == "completed"
+                )
             )
         )
-        today_revenue_result = await db.execute(today_revenue_query)
         today_revenue = today_revenue_result.scalar() or 0
         
         return {
             "total_users": total_users,
             "total_drivers": total_drivers,
             "today_orders": today_orders,
-            "total_revenue": int(today_revenue)
+            "total_revenue": int(today_revenue) if today_revenue else 0
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -439,7 +443,3 @@ async def get_admin_dashboard_stats(
     
     return {
         "total_users": total_users,
-        "total_drivers": total_drivers,
-        "orders_today": today_orders,
-        "total_revenue": int(today_revenue)
-    }
