@@ -28,11 +28,9 @@ async def get_dashboard_stats(
 ):
     """Get dashboard statistics from real data"""
     try:
-        # عدد المستخدمين (بدون admin)
+        # عدد جميع المستخدمين
         total_users_result = await db.execute(
-            select(func.count(User.id)).where(
-                User.role != "admin"
-            )
+            select(func.count(User.id))
         )
         total_users = total_users_result.scalar() or 0
         
@@ -47,7 +45,7 @@ async def get_dashboard_stats(
         )
         total_drivers = total_drivers_result.scalar() or 0
         
-        # عدد الطلبات بجميع الحالات
+        # عدد جميع الطلبات
         today_orders_result = await db.execute(
             select(func.count(Order.id))
         )
@@ -387,59 +385,3 @@ async def update_setting(
 
 
 
-
-@router.get("/dashboard/stats")
-async def get_admin_dashboard_stats(
-    current_admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get overview statistics for admin dashboard (DEPRECATED - use /admin/stats instead)"""
-    # عدد المستخدمين (بدون admin)
-    total_users_result = await db.execute(
-        select(func.count(User.id)).where(
-            User.role.astext != UserRole.ADMIN.value
-        )
-    )
-    total_users = total_users_result.scalar() or 0
-    
-    # عدد السائقين النشطين
-    total_drivers_result = await db.execute(
-        select(func.count(User.id)).where(
-            and_(
-                User.role.astext == UserRole.DRIVER.value,
-                User.is_active == True
-            )
-        )
-    )
-    total_drivers = total_drivers_result.scalar() or 0
-    
-    # عدد الطلبات اليوم
-    today = datetime.now().date()
-    today_orders_result = await db.execute(
-        select(func.count(Order.id)).where(
-            and_(
-                Order.created_at >= datetime.combine(today, datetime.min.time()),
-                Order.created_at <= datetime.combine(today, datetime.max.time())
-            )
-        )
-    )
-    today_orders = today_orders_result.scalar() or 0
-    
-    # إجمالي الأرباح اليوم
-    today_revenue_result = await db.execute(
-        select(func.sum(Order.price)).where(
-            and_(
-                Order.created_at >= datetime.combine(today, datetime.min.time()),
-                Order.created_at <= datetime.combine(today, datetime.max.time()),
-                Order.status == "completed"
-            )
-        )
-    )
-    today_revenue = today_revenue_result.scalar() or 0
-    
-    return {
-        "total_users": total_users,
-        "total_drivers": total_drivers,
-        "orders_today": today_orders,
-        "total_revenue": int(today_revenue)
-    }
