@@ -423,6 +423,9 @@ async def update_pricing_config(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/drivers/stats", response_model=List[DriverStats])
 async def get_driver_stats(
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
