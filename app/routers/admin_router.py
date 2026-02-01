@@ -386,45 +386,60 @@ async def update_setting(
     return setting
 
 
+
+
 @router.get("/dashboard/stats")
-async def get_dashboard_stats(
+async def get_admin_dashboard_stats(
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get overview statistics for admin dashboard"""
-    
-    # Total users
-    total_users = await db.execute(
-        select(func.count(User.id)).filter(User.role == UserRole.CUSTOMER)
-    )
-    
-    # Total drivers
-    total_drivers = await db.execute(
-        select(func.count(User.id)).filter(User.role == UserRole.DRIVER)
-    )
-    
-    # Active drivers (with balance)
-    active_drivers = await db.execute(
-        select(func.count(Wallet.id)).filter(Wallet.balance >= settings.DEFAULT_COMMISSION)
-    )
-    
-    # Orders today
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    orders_today = await db.execute(
-        select(func.count(Order.id)).filter(Order.created_at >= today_start)
-    )
-    
-    # Revenue (total commissions) - from completed orders
-    total_revenue = await db.execute(
-        select(func.sum(Transaction.amount)).filter(
-            Transaction.type == "deduction"
+    """Get overview statistics for admin dashboard (DEPRECATED - use /admin/stats instead)"""
+    # عدد المستخدمين (بدون admin)
+    total_users_result = await db.execute(
+        select(func.count(User.id)).where(
+            User.role.astext != UserRole.ADMIN.value
         )
     )
+    total_users = total_users_result.scalar() or 0
+    
+    # عدد السائقين النشطين
+    total_drivers_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(
+                User.role.astext == UserRole.DRIVER.value,
+                User.is_active == True
+            )
+        )
+    )
+    total_drivers = total_drivers_result.scalar() or 0
+    
+    # عدد الطلبات اليوم
+    today = datetime.now().date()
+    today_orders_result = await db.execute(
+        select(func.count(Order.id)).where(
+            and_(
+                Order.created_at >= datetime.combine(today, datetime.min.time()),
+                Order.created_at <= datetime.combine(today, datetime.max.time())
+            )
+        )
+    )
+    today_orders = today_orders_result.scalar() or 0
+    
+    # إجمالي الأرباح اليوم
+    today_revenue_result = await db.execute(
+        select(func.sum(Order.price)).where(
+            and_(
+                Order.created_at >= datetime.combine(today, datetime.min.time()),
+                Order.created_at <= datetime.combine(today, datetime.max.time()),
+                Order.status == "completed"
+            )
+        )
+    )
+    today_revenue = today_revenue_result.scalar() or 0
     
     return {
-        "total_users": total_users.scalar() or 0,
-        "total_drivers": total_drivers.scalar() or 0,
-        "active_drivers": active_drivers.scalar() or 0,
-        "orders_today": orders_today.scalar() or 0,
-        "total_revenue": total_revenue.scalar() or 0
+        "total_users": total_users,
+        "total_drivers": total_drivers,
+        "orders_today": today_orders,
+        "total_revenue": int(today_revenue)
     }
