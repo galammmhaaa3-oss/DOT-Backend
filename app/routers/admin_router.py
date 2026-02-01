@@ -372,15 +372,44 @@ async def get_pricing_config(
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get current pricing configuration"""
-    from ..config import settings
+    """Get current pricing configuration from database or defaults"""
     
-    return {
-        "taxi_base_price": settings.TAXI_BASE_PRICE,
-        "taxi_price_per_km": settings.TAXI_PRICE_PER_KM,
-        "delivery_base_price": settings.DELIVERY_BASE_PRICE,
-        "delivery_price_per_km": settings.DELIVERY_PRICE_PER_KM
-    }
+    # Try to get pricing from database first
+    try:
+        result_taxi_base = await db.execute(
+            select(SettingsModel).filter(SettingsModel.key == "taxi_base_price")
+        )
+        setting_taxi_base = result_taxi_base.scalar_one_or_none()
+        
+        result_taxi_km = await db.execute(
+            select(SettingsModel).filter(SettingsModel.key == "taxi_price_per_km")
+        )
+        setting_taxi_km = result_taxi_km.scalar_one_or_none()
+        
+        result_delivery_base = await db.execute(
+            select(SettingsModel).filter(SettingsModel.key == "delivery_base_price")
+        )
+        setting_delivery_base = result_delivery_base.scalar_one_or_none()
+        
+        result_delivery_km = await db.execute(
+            select(SettingsModel).filter(SettingsModel.key == "delivery_price_per_km")
+        )
+        setting_delivery_km = result_delivery_km.scalar_one_or_none()
+        
+        return {
+            "taxi_base_price": float(setting_taxi_base.value) if setting_taxi_base else settings.TAXI_BASE_PRICE,
+            "taxi_price_per_km": float(setting_taxi_km.value) if setting_taxi_km else settings.TAXI_PRICE_PER_KM,
+            "delivery_base_price": float(setting_delivery_base.value) if setting_delivery_base else settings.DELIVERY_BASE_PRICE,
+            "delivery_price_per_km": float(setting_delivery_km.value) if setting_delivery_km else settings.DELIVERY_PRICE_PER_KM
+        }
+    except Exception as e:
+        # Return defaults if there's an error
+        return {
+            "taxi_base_price": settings.TAXI_BASE_PRICE,
+            "taxi_price_per_km": settings.TAXI_PRICE_PER_KM,
+            "delivery_base_price": settings.DELIVERY_BASE_PRICE,
+            "delivery_price_per_km": settings.DELIVERY_PRICE_PER_KM
+        }
 
 
 @router.put("/pricing")
@@ -389,40 +418,54 @@ async def update_pricing_config(
     current_admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Update pricing configuration"""
-    from ..config import settings
+    """Update pricing configuration and save to database"""
     
     try:
-        # Update settings in database
-        for key, value in pricing_data.items():
-            result = await db.execute(
-                select(SettingsModel).filter(SettingsModel.key == key)
-            )
-            setting = result.scalar_one_or_none()
-            
-            if setting:
-                setting.value = str(value)
-            else:
-                setting = SettingsModel(
-                    key=key,
-                    value=str(value),
-                    description=f"Pricing: {key}"
-                )
-                db.add(setting)
+        # Keys mapping
+        keys_to_update = [
+            "taxi_base_price",
+            "taxi_price_per_km",
+            "delivery_base_price",
+            "delivery_price_per_km"
+        ]
         
+        # Update or create settings for each pricing field
+        for key in keys_to_update:
+            if key in pricing_data:
+                value = pricing_data[key]
+                
+                result = await db.execute(
+                    select(SettingsModel).filter(SettingsModel.key == key)
+                )
+                setting = result.scalar_one_or_none()
+                
+                if setting:
+                    setting.value = str(value)
+                    setting.updated_at = datetime.utcnow()
+                else:
+                    # Create new setting
+                    new_setting = SettingsModel(
+                        key=key,
+                        value=str(value),
+                        description=f"Pricing configuration: {key}"
+                    )
+                    db.add(new_setting)
+        
+        # Commit all changes
         await db.commit()
         
+        # Return updated values
         return {
             "status": "success",
-            "message": "Pricing configuration updated",
-            "taxi_base_price": pricing_data.get("taxi_base_price"),
-            "taxi_price_per_km": pricing_data.get("taxi_price_per_km"),
-            "delivery_base_price": pricing_data.get("delivery_base_price"),
-            "delivery_price_per_km": pricing_data.get("delivery_price_per_km")
+            "message": "تم تحديث الأسعار بنجاح",
+            "taxi_base_price": float(pricing_data.get("taxi_base_price", 5000)),
+            "taxi_price_per_km": float(pricing_data.get("taxi_price_per_km", 5000)),
+            "delivery_base_price": float(pricing_data.get("delivery_base_price", 3000)),
+            "delivery_price_per_km": float(pricing_data.get("delivery_price_per_km", 2500))
         }
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error updating pricing: {str(e)}")
 
 
 @router.get("/drivers/stats", response_model=List[DriverStats])
