@@ -443,3 +443,7 @@ async def get_admin_dashboard_stats(
     
     return {
         "total_users": total_users,
+        "total_drivers": total_drivers,
+        "orders_today": today_orders,
+        "total_revenue": int(today_revenue)
+    }
